@@ -243,6 +243,29 @@ router.put('/user/:userId', verifyToken, async (req, res) => {
     }
 });
 
+// Get All Users (for demonstration purpose) - added by Neeta
+router.get('/users', async (req, res) => {
+    const client = await getDatabase().connect(); // connects to database
+    try {
+        const result = await client.query( // queries the table users to read this information
+            'SELECT id, username, email, phone, first_name, last_name, created_at, last_login FROM users'
+        );
+        console.log(result.rows)
+
+        if (result.rows.length === 0) { // if no result found, return error with status code 404 
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        return res.json({ success: true, user: result.rows }); // returns all user's information
+    } catch (error) {
+        console.error('Get user error:', error);
+        return res.status(500).json({ error: 'Failed to get user' });
+    } finally {
+        client.release();
+    }
+});
+
+
 // delete user by ID
 router.delete('/user/:userId', verifyToken, async (req, res) => {
     const client = await getDatabase().connect();
