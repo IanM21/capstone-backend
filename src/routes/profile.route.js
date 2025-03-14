@@ -1,22 +1,51 @@
 import express from 'express';
 import { getDatabase } from '../database/database.js';
 import { verifyToken } from '../middleware/auth.js';
+import multer from 'multer';
 
 const router = express.Router();
 
-// create/update profile route
-router.post('/profile/:userId', verifyToken, async (req, res) => {
+// Multer for memory storage
+const storage = multer.memoryStorage();
+
+// File filter to only allow image uploads
+const fileFilter = (_, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+    } else {
+        cb(new Error('Not an allowed file type. Please upload JPEG or PNG only.'), false);
+    }
+};
+
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    fileFilter: fileFilter
+});
+
+// Create/update profile route
+router.post('/profile/:userId', verifyToken, upload.single('profilePicture'), async (req, res) => {
     const client = await getDatabase().connect();
     try {
         const { userId } = req.params;
-        const { bio, profilePic, age, location, interests, courses, school } = req.body;
+        const { bio, age, location, interest, courses, school } = req.body;
 
-        if (req.userId !== parseInt(req.params.userId)) {
+        // Convert userId to integer for comparison
+        if (req.userId !== parseInt(userId)) {
             return res.status(403).json({ error: 'Unauthorized to modify this profile' });
         }
 
-        if (age && (age < 13 || age > 120)) {
+        if (age && (parseInt(age) < 13 || parseInt(age) > 120)) {
             return res.status(400).json({ error: 'Invalid age' });
+        }
+
+        // Convert image to base64 string if uploaded
+        let profilePic = null;
+        if (req.file) {
+            // Store as base64 data URI
+            const base64Data = req.file.buffer.toString('base64');
+            profilePic = `data:${req.file.mimetype};base64,${base64Data}`;
         }
 
         await client.query('BEGIN');
@@ -28,34 +57,81 @@ router.post('/profile/:userId', verifyToken, async (req, res) => {
 
         let result;
         if (profileExists.rows.length === 0) {
+            // Insert new profile with base64 image data
             result = await client.query(
-                `INSERT INTO profile (user_id, bio, profile_pic, age, location, interests, courses, school)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-                [userId, bio, profilePic, age, location, interests, courses, school]
+                `INSERT INTO profile (
+                    user_id, bio, profile_pic, age, location, interests, courses, school
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+                RETURNING id, user_id, bio, age, location, interests, courses, school`,
+                [
+                    userId, bio, profilePic,
+                    age, location, interest, courses, school
+                ]
             );
         } else {
-            result = await client.query(
-                `UPDATE profile 
-               SET bio = COALESCE($1, bio),
-                   profile_pic = COALESCE($2, profile_pic),
-                   age = COALESCE($3, age),
-                   location = COALESCE($4, location),
-                   interests = COALESCE($5, interests),
-                   courses = COALESCE($6, courses),
-                   school = COALESCE($7, school)
-               WHERE user_id = $8
-               RETURNING *`,
-                [bio, profilePic, age, location, interests, courses, school, userId]
-            );
+            // Only update profile picture if a new one was provided
+            if (req.file) {
+                result = await client.query(
+                    `UPDATE profile 
+                    SET bio = COALESCE($1, bio),
+                        profile_pic = $2,
+                        age = COALESCE($3, age),
+                        location = COALESCE($4, location),
+                        interests = COALESCE($5, interests),
+                        courses = COALESCE($6, courses),
+                        school = COALESCE($7, school)
+                    WHERE user_id = $8
+                    RETURNING id, user_id, bio, age, location, interests, courses, school`,
+                    [
+                        bio || null,
+                        profilePic,
+                        age || null,
+                        location || null,
+                        interest || null,
+                        courses || null,
+                        school || null,
+                        userId
+                    ]
+                );
+            } else {
+                // Update without changing the profile picture
+                result = await client.query(
+                    `UPDATE profile 
+                    SET bio = COALESCE($1, bio),
+                        age = COALESCE($2, age),
+                        location = COALESCE($3, location),
+                        interests = COALESCE($4, interests),
+                        courses = COALESCE($5, courses),
+                        school = COALESCE($6, school)
+                    WHERE user_id = $7
+                    RETURNING id, user_id, bio, age, location, interests, courses, school`,
+                    [
+                        bio || null,
+                        age || null,
+                        location || null,
+                        interest || null,
+                        courses || null,
+                        school || null,
+                        userId
+                    ]
+                );
+            }
         }
 
         await client.query('COMMIT');
-        return res.json({ success: true, profile: result.rows[0] });
+
+        return res.json({
+            success: true,
+            profile: result.rows[0],
+            message: 'Profile updated successfully',
+            hasProfilePic: !!profilePic
+        });
 
     } catch (error) {
         await client.query('ROLLBACK');
         console.error('Profile update error:', error);
-        return res.status(500).json({ error: 'Failed to update profile' });
+        return res.status(500).json({ error: 'Failed to update profile: ' + error.message });
     } finally {
         client.release();
     }
