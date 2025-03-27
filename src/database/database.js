@@ -6,11 +6,11 @@ dotenv.config();
 
 const pool = new Pool({
     //connectionString: process.env.DATABASE_URL,
-     password: 'group6',
-     user: 'fsplus',
-     host: 'localhost',
-     database: 'friendship_plus',
-     port: 5432,
+     password: ,
+     user: ,
+     host: ,
+     database: ,
+     port: ,
     ssl: process.env.NODE_ENV === 'production' ? {
         rejectUnauthorized: false
     } : undefined
