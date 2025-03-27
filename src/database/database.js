@@ -5,14 +5,23 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    //connectionString: process.env.DATABASE_URL,
+     password: 'group6',
+     user: 'fsplus',
+     host: 'localhost',
+     database: 'friendship_plus',
+     port: 5432,
     ssl: process.env.NODE_ENV === 'production' ? {
         rejectUnauthorized: false
     } : undefined
 });
 
 export const initializeDatabase = async () => {
-    const client = await pool.connect();
+    //const client = await pool.connect()
+    //.then(() => console.log("Connected to Database"))
+    //.catch( error => console.error("Database connection error:", error));
+    const client = pool;
+    
     try {
         await client.query(`
             CREATE TABLE IF NOT EXISTS users (
@@ -51,7 +60,7 @@ export const initializeDatabase = async () => {
     } catch (e) {
         console.error('Failed to initialize database', e);
     } finally {
-        client.release();
+        //client.release();
     }
 }
 

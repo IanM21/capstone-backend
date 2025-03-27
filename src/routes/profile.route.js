@@ -142,14 +142,17 @@ router.get('/profile/:userId', verifyToken, async (req, res) => {
     const client = await getDatabase().connect();
     try {
         const { userId } = req.params;
+        console.log("userID:",userId)
         const result = await client.query(
-            'SELECT * FROM profile WHERE user_id = $1',
-            [userId]
+             'SELECT * FROM profile WHERE user_id = $1',
+             [userId]
         );
+         console.log("result:",result.rows.length)
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Profile not found' });
         }
+        console.log("test-text",result.rows[0])
 
         return res.json({ success: true, profile: result.rows[0] });
     } catch (error) {
@@ -159,5 +162,28 @@ router.get('/profile/:userId', verifyToken, async (req, res) => {
         client.release();
     }
 });
+
+// Get All Profiles (for search functionality) - added by Neeta
+router.get('/profile', verifyToken, async (req, res) => {
+    const client = await getDatabase().connect(); // connects to database
+    try {
+        const result = await client.query( // queries the table users to read this information
+            'SELECT user_id, profile_pic, location, interests, courses, school FROM profile'
+        );
+        console.log(result.rows)
+
+        if (result.rows.length === 0) { // if no result found, return error with status code 404 
+            return res.status(404).json({ error: 'Profile not found' });
+        }
+
+        return res.json({ success: true, profiles: result.rows }); // returns all user's information
+    } catch (error) {
+        console.error('Get user error:', error);
+        return res.status(500).json({ error: 'Failed to get user' });
+    } finally {
+        client.release();
+    }
+});
+
 
 export default router;

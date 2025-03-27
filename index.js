@@ -30,6 +30,8 @@ app.use('/api', loginRouter, profileRouter);
 const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, () => {
+    console.log('before')
     initializeDatabase();
+    console.log('after')
     console.log(`Server is running on port ${PORT}`);
 });

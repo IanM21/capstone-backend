@@ -1,5 +1,12 @@
+#
+# docker-compose -p friendship_plus_db -f docker-compose.yml up -d
+#
+# General (Name: friendship_plus_db)
+# Connection ()
+
+
 services:
-  db:
+  friendship_plus_db:
     image: postgres:latest
     container_name: friendship_plus_db
     environment:
@@ -10,6 +17,19 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+
+
+
+
+  pgadmin:
+    image: dpage/pgadmin4
+    ports: 
+      - "8888:80"
+    container_name: pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=user@domain.ca
+      - PGADMIN_DEFAULT_PASSWORD=password
 
 volumes:
   postgres_data:

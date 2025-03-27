@@ -69,6 +69,7 @@ router.post('/signup', async (req, res) => {
 
 // Login route
 router.post('/login', async (req, res) => { 
+    console.log("process.env.JWT_SECRET:",process.env.JWT_SECRET)
     const client = await getDatabase().connect();
 
     try {
@@ -243,8 +244,8 @@ router.put('/user/:userId', verifyToken, async (req, res) => {
     }
 });
 
-// Get All Users (for demonstration purpose) - added by Neeta
-router.get('/users', async (req, res) => {
+// Get All Users (for demonstration purpose and for search functionality) - added by Neeta
+router.get('/users', verifyToken, async (req, res) => {
     const client = await getDatabase().connect(); // connects to database
     try {
         const result = await client.query( // queries the table users to read this information
