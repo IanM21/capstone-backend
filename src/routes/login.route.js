@@ -69,7 +69,6 @@ router.post('/signup', async (req, res) => {
 
 // Login route
 router.post('/login', async (req, res) => { 
-    console.log("process.env.JWT_SECRET:",process.env.JWT_SECRET)
     const client = await getDatabase().connect();
 
     try {
@@ -265,7 +264,6 @@ router.get('/users', verifyToken, async (req, res) => {
         client.release();
     }
 });
-
 
 // delete user by ID
 router.delete('/user/:userId', verifyToken, async (req, res) => {

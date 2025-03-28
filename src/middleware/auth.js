@@ -1,12 +1,9 @@
 // auth.js middleware
 import jwt from 'jsonwebtoken';
 
-//const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_SECRET = "place-jwt-token-here"
+const JWT_SECRET = process.env.JWT_SECRET;
 
 export const createToken = (user) => {
-    console.log("process.env.JWT_SECRET:",process.env.JWT_SECRET)
-    console.log("JWT_SECRET:",JWT_SECRET)
     return jwt.sign(
         { userId: user.id },
         JWT_SECRET,

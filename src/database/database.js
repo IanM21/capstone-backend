@@ -5,24 +5,20 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const pool = new Pool({
-    //connectionString: process.env.DATABASE_URL,
-     password: ,
-     user: ,
-     host: ,
-     database: ,
-     port: ,
+    connectionString: process.env.DATABASE_URL,
     ssl: process.env.NODE_ENV === 'production' ? {
         rejectUnauthorized: false
     } : undefined
 });
 
 export const initializeDatabase = async () => {
-    //const client = await pool.connect()
-    //.then(() => console.log("Connected to Database"))
-    //.catch( error => console.error("Database connection error:", error));
-    const client = pool;
-    
+    let client;
+
     try {
+        client = await pool.connect();
+        console.log("Connected to Database");
+
+        // Create tables
         await client.query(`
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -51,7 +47,7 @@ export const initializeDatabase = async () => {
                 profile_pic TEXT,
                 age INTEGER,
                 location TEXT,
-                interests TEXT,
+                interests TEXT[],
                 courses TEXT,
                 school TEXT,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -60,7 +56,9 @@ export const initializeDatabase = async () => {
     } catch (e) {
         console.error('Failed to initialize database', e);
     } finally {
-        //client.release();
+        if (client) {
+            client.release();
+        }
     }
 }
 

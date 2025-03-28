@@ -29,7 +29,7 @@ router.post('/profile/:userId', verifyToken, upload.single('profilePicture'), as
     const client = await getDatabase().connect();
     try {
         const { userId } = req.params;
-        const { bio, age, location, interest, courses, school } = req.body;
+        const { bio, age, location, interests, courses, school } = req.body;
 
         // Convert userId to integer for comparison
         if (req.userId !== parseInt(userId)) {
@@ -38,6 +38,19 @@ router.post('/profile/:userId', verifyToken, upload.single('profilePicture'), as
 
         if (age && (parseInt(age) < 13 || parseInt(age) > 120)) {
             return res.status(400).json({ error: 'Invalid age' });
+        }
+
+        // Process interests as an array
+        let interestsArray = interests;
+        // If interests comes as a string, parse it (from JSON) or split it
+        if (interests && typeof interests === 'string') {
+            try {
+                // Try to parse as JSON first (if sent as JSON string)
+                interestsArray = JSON.parse(interests);
+            } catch (e) {
+                // If not valid JSON, split by commas (if sent as comma-separated string)
+                interestsArray = interests.split(',').map(item => item.trim());
+            }
         }
 
         // Convert image to base64 string if uploaded
@@ -66,7 +79,7 @@ router.post('/profile/:userId', verifyToken, upload.single('profilePicture'), as
                 RETURNING id, user_id, bio, age, location, interests, courses, school`,
                 [
                     userId, bio, profilePic,
-                    age, location, interest, courses, school
+                    age, location, interestsArray, courses, school
                 ]
             );
         } else {
@@ -88,7 +101,7 @@ router.post('/profile/:userId', verifyToken, upload.single('profilePicture'), as
                         profilePic,
                         age || null,
                         location || null,
-                        interest || null,
+                        interestsArray || null,
                         courses || null,
                         school || null,
                         userId
@@ -110,7 +123,7 @@ router.post('/profile/:userId', verifyToken, upload.single('profilePicture'), as
                         bio || null,
                         age || null,
                         location || null,
-                        interest || null,
+                        interestsArray || null,
                         courses || null,
                         school || null,
                         userId
@@ -142,17 +155,14 @@ router.get('/profile/:userId', verifyToken, async (req, res) => {
     const client = await getDatabase().connect();
     try {
         const { userId } = req.params;
-        console.log("userID:",userId)
         const result = await client.query(
-             'SELECT * FROM profile WHERE user_id = $1',
-             [userId]
+            'SELECT * FROM profile WHERE user_id = $1',
+            [userId]
         );
-         console.log("result:",result.rows.length)
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Profile not found' });
         }
-        console.log("test-text",result.rows[0])
 
         return res.json({ success: true, profile: result.rows[0] });
     } catch (error) {
@@ -170,7 +180,6 @@ router.get('/profile', verifyToken, async (req, res) => {
         const result = await client.query( // queries the table users to read this information
             'SELECT user_id, profile_pic, location, interests, courses, school FROM profile'
         );
-        console.log(result.rows)
 
         if (result.rows.length === 0) { // if no result found, return error with status code 404 
             return res.status(404).json({ error: 'Profile not found' });
@@ -185,5 +194,75 @@ router.get('/profile', verifyToken, async (req, res) => {
     }
 });
 
+// Search profiles by interest
+router.get('/profile/search/:interest', verifyToken, async (req, res) => {
+    const client = await getDatabase().connect();
+    try {
+        const { interest } = req.params;
+
+        // Find profiles where the interests array contains the specified interest
+        const profilesResult = await client.query(
+            'SELECT user_id, profile_pic, age, location, interests, courses, school FROM profile WHERE $1 = ANY(interests)',
+            [interest]
+        );
+
+        // If no profiles found, return empty array
+        if (profilesResult.rows.length === 0) {
+            return res.json({
+                success: true,
+                results: [],
+                count: 0
+            });
+        }
+
+        // Get all user_ids from the profile results
+        const userIds = profilesResult.rows.map(profile => profile.user_id);
+
+        // Get all corresponding users in a single query
+        const usersResult = await client.query(
+            'SELECT id, first_name, last_name FROM users WHERE id = ANY($1)',
+            [userIds]
+        );
+
+        // Create a map for quick user lookup by id
+        const userMap = {};
+        usersResult.rows.forEach(user => {
+            userMap[user.id] = {
+                first_name: user.first_name,
+                last_name: user.last_name
+            };
+        });
+
+        // Combine user and profile data into a single clean result
+        const combinedResults = profilesResult.rows.map(profile => {
+            const user = userMap[profile.user_id];
+
+            // Skip if no matching user found (shouldn't happen with proper foreign keys)
+            if (!user) return null;
+
+            return {
+                user_id: profile.user_id,
+                name: `${user.first_name} ${user.last_name}`,
+                age: profile.age,
+                location: profile.location,
+                interests: profile.interests,
+                courses: profile.courses,
+                school: profile.school,
+                profile_pic: profile.profile_pic
+            };
+        }).filter(result => result !== null); // Remove any nulls
+
+        return res.json({
+            success: true,
+            results: combinedResults,
+            count: combinedResults.length
+        });
+    } catch (error) {
+        console.error('Profile search error:', error);
+        return res.status(500).json({ error: 'Failed to search profiles by interest' });
+    } finally {
+        client.release();
+    }
+});
 
 export default router;
