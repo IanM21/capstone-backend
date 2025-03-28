@@ -24,6 +24,10 @@ app.use(cookieParser());
 app.use(express.json());
 
 // Routes
+app.get('/', (_, res) => {
+    res.send('Hello World');
+});
+
 app.use('/api', loginRouter, profileRouter);
 
 // Set the port explicitly to 3001
