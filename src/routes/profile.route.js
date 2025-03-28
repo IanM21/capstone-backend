@@ -2,6 +2,8 @@ import express from 'express';
 import { getDatabase } from '../database/database.js';
 import { verifyToken } from '../middleware/auth.js';
 import multer from 'multer';
+import sharp from 'sharp';
+
 
 const router = express.Router();
 
@@ -20,7 +22,7 @@ const fileFilter = (_, file, cb) => {
 
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    limits: { fileSize: 1 * 1024 * 1024 }, // 1MB limit
     fileFilter: fileFilter
 });
 
@@ -56,8 +58,14 @@ router.post('/profile/:userId', verifyToken, upload.single('profilePicture'), as
         // Convert image to base64 string if uploaded
         let profilePic = null;
         if (req.file) {
-            // Store as base64 data URI
-            const base64Data = req.file.buffer.toString('base64');
+            // Resize and compress image
+            const resizedImageBuffer = await sharp(req.file.buffer)
+                .resize({ width: 400, height: 400, fit: 'inside' })
+                .jpeg({ quality: 70 })
+                .toBuffer();
+
+            // Convert to base64 with smaller size
+            const base64Data = resizedImageBuffer.toString('base64');
             profilePic = `data:${req.file.mimetype};base64,${base64Data}`;
         }
 
